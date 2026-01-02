@@ -65,10 +65,10 @@ th{background:#f5f5f5}
 </div>
 
 <div class="card warning">
-<h4>تصفية وترحيل المصروفات</h4>
-<p>يمكنك تصفية المصروفات الشهرية أو اللحظية وترحيلها للأرشيف</p>
-<button onclick="closeMonth()">تصفية وترحيل الشهر</button>
-<button onclick="instantClear()">تصفية وترحيل لحظي</button>
+<h4>تصفية وترحيل المصروفات والدخل</h4>
+<p>يمكنك ترحيل العمليات الشهرية أو اللحظية وحساب الفارق.</p>
+<button onclick="closeMonth()">ترحيل الشهر</button>
+<button onclick="instantClear()">ترحيل لحظي</button>
 </div>
 
 <div class="card">
@@ -136,12 +136,10 @@ th{background:#f5f5f5}
 </div>
 
 <script>
-/* ===== المتغيرات ===== */
 let transactions = JSON.parse(localStorage.getItem('financeData')) || [];
 let debtData = JSON.parse(localStorage.getItem('debtData')) || [];
 let archiveData = JSON.parse(localStorage.getItem('archiveData')) || [];
 
-/* ===== التنقل ===== */
 function showSection(s){
 finance.style.display=s==='finance'?'block':'none';
 debts.style.display=s==='debts'?'block':'none';
@@ -192,7 +190,6 @@ totalExpense.textContent=exp;
 balance.textContent=inc-exp;
 }
 
-/* تعديل وحذف العمليات */
 function editTransaction(i){
 const t = transactions[i];
 const newDesc = prompt("تعديل الوصف:", t.desc);
@@ -202,6 +199,7 @@ if(newAmount!==null && !isNaN(newAmount)) t.amount=+newAmount;
 localStorage.setItem('financeData',JSON.stringify(transactions));
 renderTransactions();
 }
+
 function deleteTransaction(i){
 if(!confirm('هل تريد حذف هذه العملية؟')) return;
 transactions.splice(i,1);
@@ -209,35 +207,80 @@ localStorage.setItem('financeData',JSON.stringify(transactions));
 renderTransactions();
 }
 
-/* ===== الترحيل ===== */
+/* ===== ترحيل الشهر مع الدخل والمصروف وحساب الفارق ===== */
 function closeMonth(){
-if(!confirm('هل تريد إغلاق الشهر وترحيل المصروفات؟')) return;
+if(!confirm('هل تريد ترحيل كل العمليات وحساب الفارق؟')) return;
+
 const now = new Date();
 const m = now.getMonth()+1;
 const y = now.getFullYear();
-const expenses = transactions.filter(t => t.type==='expense' && Number(t.month)===m && Number(t.year)===y);
-if(expenses.length===0) return alert('لا توجد مصروفات لترحيلها هذا الشهر');
-archiveData.push({month:m,year:y,data:expenses});
-transactions = transactions.filter(t => !(t.type==='expense' && Number(t.month)===m && Number(t.year)===y));
+
+const monthTransactions = transactions.filter(t => Number(t.month)===m && Number(t.year)===y);
+if(monthTransactions.length===0) return alert('لا توجد عمليات لترحيلها لهذا الشهر');
+
+let totalIncomeMonth = 0;
+let totalExpenseMonth = 0;
+monthTransactions.forEach(t=>{
+  if(t.type==='income') totalIncomeMonth += t.amount;
+  else if(t.type==='expense') totalExpenseMonth += t.amount;
+});
+
+const diff = totalIncomeMonth - totalExpenseMonth;
+const status = diff>=0 ? 'رصيد' : 'نقص';
+
+archiveData.push({
+  month: m,
+  year: y,
+  transactions: monthTransactions,
+  totalIncome: totalIncomeMonth,
+  totalExpense: totalExpenseMonth,
+  balance: diff,
+  status: status
+});
+
+transactions = transactions.filter(t => !(Number(t.month)===m && Number(t.year)===y));
+
 localStorage.setItem('financeData', JSON.stringify(transactions));
 localStorage.setItem('archiveData', JSON.stringify(archiveData));
 updateArchiveSelect();
 renderTransactions();
-alert('تم ترحيل المصروفات بنجاح');
+
+alert(`تم ترحيل الشهر بنجاح!\nالدخل: ${totalIncomeMonth}\nالمصروف: ${totalExpenseMonth}\n${status}: ${diff}`);
 }
 
 function instantClear(){
-if(!confirm('هل تريد تصفية وترحيل جميع المصروفات الآن؟')) return;
-const allExpenses = transactions.filter(t => t.type==='expense');
-if(allExpenses.length===0) return alert('لا توجد مصروفات لترحيلها');
+if(!confirm('هل تريد ترحيل جميع العمليات الآن؟')) return;
+const allTransactions = transactions.filter(t=>true);
+if(allTransactions.length===0) return alert('لا توجد عمليات لترحيلها');
+
 const now = new Date();
-archiveData.push({month: now.getMonth()+1, year: now.getFullYear(), date: now.toLocaleDateString('ar-EG'), data: allExpenses});
-transactions = transactions.filter(t => t.type!=='expense');
+let totalIncomeMonth = 0;
+let totalExpenseMonth = 0;
+allTransactions.forEach(t=>{
+  if(t.type==='income') totalIncomeMonth += t.amount;
+  else if(t.type==='expense') totalExpenseMonth += t.amount;
+});
+
+const diff = totalIncomeMonth - totalExpenseMonth;
+const status = diff>=0 ? 'رصيد' : 'نقص';
+
+archiveData.push({
+  month: now.getMonth()+1,
+  year: now.getFullYear(),
+  transactions: allTransactions,
+  totalIncome: totalIncomeMonth,
+  totalExpense: totalExpenseMonth,
+  balance: diff,
+  status: status
+});
+
+transactions = [];
 localStorage.setItem('financeData', JSON.stringify(transactions));
 localStorage.setItem('archiveData', JSON.stringify(archiveData));
 updateArchiveSelect();
 renderTransactions();
-alert('تم ترحيل جميع المصروفات لحظياً');
+
+alert(`تم ترحيل جميع العمليات!\nالدخل: ${totalIncomeMonth}\nالمصروف: ${totalExpenseMonth}\n${status}: ${diff}`);
 }
 
 /* ===== الديون ===== */
@@ -272,7 +315,6 @@ debtList.innerHTML+=`
 });
 }
 
-/* تعديل وحذف وسداد الديون */
 function editDebt(i){
 const d = debtData[i];
 const newDebtor = prompt("تعديل الاسم:", d.debtor);
@@ -316,7 +358,8 @@ function renderArchive(){
 archiveList.innerHTML='';
 const i=archiveSelect.value;
 if(i==='') return;
-archiveData[i].data.forEach(t=>{
+const a = archiveData[i];
+a.transactions.forEach(t=>{
 archiveList.innerHTML+=`
 <tr>
 <td>${t.category}</td>
@@ -325,6 +368,8 @@ archiveList.innerHTML+=`
 <td>${t.date}</td>
 </tr>`;
 });
+// يمكن إضافة عرض الفارق والرصيد هنا
+archiveList.innerHTML += `<tr><td colspan="4">الدخل: ${a.totalIncome} | المصروف: ${a.totalExpense} | ${a.status}: ${a.balance}</td></tr>`;
 }
 
 function clearArchive(){
@@ -392,9 +437,10 @@ async function exportArchivePDF(){
     doc.autoTable({
         startY:25,
         head:[['التاريخ','الفئة','الوصف','المبلغ']],
-        body: a.data.map(t=>[t.date,t.category,t.desc,t.amount]),
+        body: a.transactions.map(t=>[t.date,t.category,t.desc,t.amount]),
         styles:{ font:'arabic', halign:'right' }
     });
+    doc.text(`الدخل: ${a.totalIncome} | المصروف: ${a.totalExpense} | ${a.status}: ${a.balance}`, 200, doc.lastAutoTable.finalY + 10, {align:'right'});
     doc.save(`ارشيف_${a.month}_${a.year}.pdf`);
 }
 
