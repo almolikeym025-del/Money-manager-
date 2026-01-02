@@ -263,58 +263,62 @@ archiveList.innerHTML='';
 }
 
 /* ===== PDF عربي ===== */
-async function loadFont(doc){
-const r=await fetch('NotoNaskhArabic-Regular.ttf');
-const b=await r.arrayBuffer();
-const f=btoa(String.fromCharCode(...new Uint8Array(b)));
-doc.addFileToVFS('arab.ttf',f);
-doc.addFont('arab.ttf','arab','normal');
-doc.setFont('arab');
+async function loadFontArabic(doc){
+    const fontUrl = 'NotoNaskhArabic-Regular.ttf';
+    const response = await fetch(fontUrl);
+    const buffer = await response.arrayBuffer();
+    const bytes = new Uint8Array(buffer);
+    let binary = '';
+    for(let i=0;i<bytes.byteLength;i++){ binary += String.fromCharCode(bytes[i]); }
+    const base64 = btoa(binary);
+    doc.addFileToVFS('NotoNaskhArabic-Regular.ttf', base64);
+    doc.addFont('NotoNaskhArabic-Regular.ttf','arabic','normal');
+    doc.setFont('arabic');
 }
 
 async function exportFinancePDF(){
-const {jsPDF}=window.jspdf;
-const doc=new jsPDF();
-await loadFont(doc);
-doc.text('كشف العمليات الحالية',200,15,{align:'right'});
-doc.autoTable({
-startY:25,
-head:[['التاريخ','النوع','الفئة','الوصف','المبلغ']],
-body:transactions.map(t=>[t.date,t.type==='income'?'دخل':'مصروف',t.category,t.desc,t.amount]),
-styles:{font:'arab',halign:'right'}
-});
-doc.save('العمليات_الحالية.pdf');
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+    await loadFontArabic(doc);
+    doc.text('كشف العمليات المالية', 200, 15, { align: 'right' });
+    doc.autoTable({
+        startY: 25,
+        head: [['التاريخ','النوع','الفئة','الوصف','المبلغ']],
+        body: transactions.map(t=>[t.date,t.type==='income'?'دخل':'مصروف',t.category,t.desc,t.amount]),
+        styles:{ font:'arabic', halign:'right' }
+    });
+    doc.save('العمليات.pdf');
 }
 
 async function exportDebtPDF(){
-const {jsPDF}=window.jspdf;
-const doc=new jsPDF();
-await loadFont(doc);
-doc.text('كشف الديون',200,15,{align:'right'});
-doc.autoTable({
-startY:25,
-head:[['التاريخ','الاسم','النوع','المبلغ']],
-body:debtData.map(d=>[d.date,d.debtor,d.type==='owedToYou'?'مدين لك':'أنت مدين',d.amount]),
-styles:{font:'arab',halign:'right'}
-});
-doc.save('الديون.pdf');
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+    await loadFontArabic(doc);
+    doc.text('كشف الديون', 200, 15, { align: 'right' });
+    doc.autoTable({
+        startY: 25,
+        head: [['التاريخ','الاسم','النوع','المبلغ']],
+        body: debtData.map(d=>[d.date,d.debtor,d.type==='owedToYou'?'مدين لك':'أنت مدين',d.amount]),
+        styles:{ font:'arabic', halign:'right' }
+    });
+    doc.save('الديون.pdf');
 }
 
 async function exportArchivePDF(){
-const i=archiveSelect.value;
-if(i==='') return;
-const {jsPDF}=window.jspdf;
-const doc=new jsPDF();
-await loadFont(doc);
-const a=archiveData[i];
-doc.text(`مصروفات ${a.month}/${a.year}`,200,15,{align:'right'});
-doc.autoTable({
-startY:25,
-head:[['التاريخ','الفئة','الوصف','المبلغ']],
-body:a.data.map(t=>[t.date,t.category,t.desc,t.amount]),
-styles:{font:'arab',halign:'right'}
-});
-doc.save(`ارشيف_${a.month}_${a.year}.pdf`);
+    const i = archiveSelect.value;
+    if(i==='') return;
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+    await loadFontArabic(doc);
+    const a = archiveData[i];
+    doc.text(`مصروفات ${a.month}/${a.year}`, 200, 15, { align: 'right' });
+    doc.autoTable({
+        startY:25,
+        head:[['التاريخ','الفئة','الوصف','المبلغ']],
+        body: a.data.map(t=>[t.date,t.category,t.desc,t.amount]),
+        styles:{ font:'arabic', halign:'right' }
+    });
+    doc.save(`ارشيف_${a.month}_${a.year}.pdf`);
 }
 
 /* ===== تحميل عند التشغيل ===== */
