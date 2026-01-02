@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>المدير المالي الشخصي</title>
+<title>المدير المالي الشخصي - احترافي</title>
 
 <style>
 body{font-family:Tajawal,Arial;background:#f4f6f8;margin:0}
@@ -23,6 +23,10 @@ th{background:#f5f5f5}
 .income{color:#2e7d32;font-weight:bold}
 .expense{color:#c62828;font-weight:bold}
 .warning{background:#fff3e0}
+.actionBtn{margin:2px;padding:4px 8px;font-size:14px;border-radius:6px;}
+.editBtn{background:#ffb300;}
+.deleteBtn{background:#c62828;}
+.payBtn{background:#2e7d32;}
 </style>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
@@ -31,7 +35,7 @@ th{background:#f5f5f5}
 
 <body>
 
-<header>المدير المالي الشخصي</header>
+<header>المدير المالي الشخصي - احترافي</header>
 
 <div class="nav">
 <button id="financeBtn" class="active" onclick="showSection('finance')">العمليات</button>
@@ -61,8 +65,8 @@ th{background:#f5f5f5}
 </div>
 
 <div class="card warning">
-<h4>إغلاق الشهر</h4>
-<p>سيتم ترحيل مصروفات الشهر الحالي إلى الأرشيف</p>
+<h4>تصفية وترحيل المصروفات</h4>
+<p>يمكنك تصفية المصروفات الشهرية أو اللحظية وترحيلها للأرشيف</p>
 <button onclick="closeMonth()">تصفية وترحيل الشهر</button>
 <button onclick="instantClear()">تصفية وترحيل لحظي</button>
 </div>
@@ -70,7 +74,7 @@ th{background:#f5f5f5}
 <div class="card">
 <table>
 <thead>
-<tr><th>النوع</th><th>الفئة</th><th>الوصف</th><th>المبلغ</th><th>التاريخ</th></tr>
+<tr><th>النوع</th><th>الفئة</th><th>الوصف</th><th>المبلغ</th><th>التاريخ</th><th>الإجراءات</th></tr>
 </thead>
 <tbody id="transactionList"></tbody>
 </table>
@@ -82,7 +86,7 @@ th{background:#f5f5f5}
 <div class="box">الرصيد<br><span id="balance">0</span></div>
 </div>
 
-<button onclick="exportFinancePDF()">تصدير كشف الشهر PDF</button>
+<button onclick="exportFinancePDF()">تصدير كشف العمليات PDF</button>
 </div>
 
 <!-- الديون -->
@@ -100,7 +104,7 @@ th{background:#f5f5f5}
 
 <div class="card">
 <table>
-<thead><tr><th>الاسم</th><th>المبلغ</th><th>النوع</th><th>التاريخ</th></tr></thead>
+<thead><tr><th>الاسم</th><th>المبلغ</th><th>النوع</th><th>التاريخ</th><th>الإجراءات</th></tr></thead>
 <tbody id="debtList"></tbody>
 </table>
 </div>
@@ -168,7 +172,7 @@ renderTransactions();
 function renderTransactions(){
 transactionList.innerHTML='';
 let inc=0,exp=0;
-transactions.forEach(t=>{
+transactions.forEach((t,index)=>{
 transactionList.innerHTML+=`
 <tr>
 <td>${t.type==='income'?'دخل':'مصروف'}</td>
@@ -176,6 +180,10 @@ transactionList.innerHTML+=`
 <td>${t.desc}</td>
 <td>${t.amount}</td>
 <td>${t.date}</td>
+<td>
+<button class="actionBtn editBtn" onclick="editTransaction(${index})">تعديل</button>
+<button class="actionBtn deleteBtn" onclick="deleteTransaction(${index})">حذف</button>
+</td>
 </tr>`;
 t.type==='income'?inc+=t.amount:exp+=t.amount;
 });
@@ -184,19 +192,33 @@ totalExpense.textContent=exp;
 balance.textContent=inc-exp;
 }
 
+/* تعديل وحذف العمليات */
+function editTransaction(i){
+const t = transactions[i];
+const newDesc = prompt("تعديل الوصف:", t.desc);
+if(newDesc!==null) t.desc=newDesc;
+const newAmount = prompt("تعديل المبلغ:", t.amount);
+if(newAmount!==null && !isNaN(newAmount)) t.amount=+newAmount;
+localStorage.setItem('financeData',JSON.stringify(transactions));
+renderTransactions();
+}
+function deleteTransaction(i){
+if(!confirm('هل تريد حذف هذه العملية؟')) return;
+transactions.splice(i,1);
+localStorage.setItem('financeData',JSON.stringify(transactions));
+renderTransactions();
+}
+
 /* ===== إغلاق الشهر ===== */
 function closeMonth(){
 if(!confirm('هل تريد إغلاق الشهر وترحيل المصروفات؟')) return;
 const now=new Date();
 const m = now.getMonth()+1;
 const y = now.getFullYear();
-
 const expenses = transactions.filter(t => t.type==='expense' && Number(t.month)===m && Number(t.year)===y);
 if(!expenses.length) return alert('لا توجد مصروفات لهذا الشهر');
-
 archiveData.push({month:m,year:y,data:expenses});
 transactions = transactions.filter(t => !(t.type==='expense' && Number(t.month)===m && Number(t.year)===y));
-
 localStorage.setItem('financeData',JSON.stringify(transactions));
 localStorage.setItem('archiveData',JSON.stringify(archiveData));
 updateArchiveSelect();
@@ -209,24 +231,10 @@ function instantClear(){
 if(!confirm('هل تريد تصفية وترحيل جميع المصروفات الآن؟')) return;
 const now = new Date();
 const d = now.toLocaleDateString('ar-EG');
-
-if(transactions.length === 0){
-alert('لا توجد مصروفات لترحيلها');
-return;
-}
-
-// نسخ كل المصروفات إلى الأرشيف مع علامة "لحظي"
 const allExpenses = transactions.filter(t => t.type==='expense');
-archiveData.push({
-month: now.getMonth()+1,
-year: now.getFullYear(),
-date:d,
-data: allExpenses
-});
-
-// حذف المصروفات بعد الترحيل
+if(!allExpenses.length) return alert('لا توجد مصروفات لترحيلها');
+archiveData.push({month: now.getMonth()+1, year: now.getFullYear(), date:d, data: allExpenses});
 transactions = transactions.filter(t => t.type!=='expense');
-
 localStorage.setItem('financeData', JSON.stringify(transactions));
 localStorage.setItem('archiveData', JSON.stringify(archiveData));
 updateArchiveSelect();
@@ -250,15 +258,52 @@ renderDebts();
 
 function renderDebts(){
 debtList.innerHTML='';
-debtData.forEach(d=>{
+debtData.forEach((d,i)=>{
 debtList.innerHTML+=`
 <tr>
 <td>${d.debtor}</td>
 <td>${d.amount}</td>
 <td>${d.type==='owedToYou'?'مدين لك':'أنت مدين'}</td>
 <td>${d.date}</td>
+<td>
+<button class="actionBtn editBtn" onclick="editDebt(${i})">تعديل</button>
+<button class="actionBtn deleteBtn" onclick="deleteDebt(${i})">حذف</button>
+<button class="actionBtn payBtn" onclick="payDebt(${i})">سداد</button>
+</td>
 </tr>`;
 });
+}
+
+/* تعديل وحذف وسداد الديون */
+function editDebt(i){
+const d = debtData[i];
+const newDebtor = prompt("تعديل الاسم:", d.debtor);
+if(newDebtor!==null) d.debtor=newDebtor;
+const newAmount = prompt("تعديل المبلغ:", d.amount);
+if(newAmount!==null && !isNaN(newAmount)) d.amount=+newAmount;
+localStorage.setItem('debtData',JSON.stringify(debtData));
+renderDebts();
+}
+
+function deleteDebt(i){
+if(!confirm('هل تريد حذف هذا الدين؟')) return;
+debtData.splice(i,1);
+localStorage.setItem('debtData',JSON.stringify(debtData));
+renderDebts();
+}
+
+function payDebt(i){
+const d = debtData[i];
+const payAmount = prompt(`المبلغ المراد سداده (الرصيد الحالي: ${d.amount}):`, d.amount);
+if(payAmount!==null && !isNaN(payAmount)){
+    if(+payAmount >= d.amount){
+        debtData.splice(i,1);
+    } else {
+        d.amount -= +payAmount;
+    }
+    localStorage.setItem('debtData',JSON.stringify(debtData));
+    renderDebts();
+}
 }
 
 /* ===== الأرشيف ===== */
