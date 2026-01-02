@@ -33,14 +33,15 @@ th{background:#f5f5f5}
 <header>المدير المالي الشخصي</header>
 
 <div class="nav">
-  <button id="financeBtn" class="active" onclick="showSection('finance')">العمليات</button>
-  <button id="debtBtn" onclick="showSection('debts')">الديون</button>
+<button id="financeBtn" class="active" onclick="showSection('finance')">العمليات</button>
+<button id="debtBtn" onclick="showSection('debts')">الديون</button>
 </div>
 
 <div class="container">
 
 <!-- العمليات -->
 <div id="finance">
+
 <div class="card">
 <select id="type">
 <option value="income">دخل</option>
@@ -57,18 +58,13 @@ th{background:#f5f5f5}
 <button id="addBtn" onclick="addTransaction()">إضافة</button>
 </div>
 
-<!-- إيقاف مؤقت -->
+<!-- تصفية المصروفات الشهرية -->
 <div class="card">
-<input id="pauseTime" type="number" placeholder="مدة التوقف بالثواني">
-<button onclick="pauseOperations()">إيقاف العمليات مؤقتًا</button>
-</div>
-
-<!-- تصفية شهرية -->
-<div class="card">
-<select id="filterMonth" onchange="renderTransactions()">
+<h4>تصفية المصروفات الشهرية</h4>
+<select id="expenseMonth" onchange="renderTransactions()">
 <option value="">كل الشهور</option>
 </select>
-<select id="filterYear" onchange="renderTransactions()">
+<select id="expenseYear" onchange="renderTransactions()">
 <option value="">كل السنوات</option>
 </select>
 </div>
@@ -76,11 +72,9 @@ th{background:#f5f5f5}
 <div class="card">
 <table>
 <thead>
-<tr>
-<th>النوع</th><th>الفئة</th><th>الوصف</th><th>المبلغ</th><th>التاريخ</th>
-</tr>
+<tr><th>النوع</th><th>الفئة</th><th>الوصف</th><th>المبلغ</th><th>التاريخ</th></tr>
 </thead>
-<tbody id="list"></tbody>
+<tbody id="transactionList"></tbody>
 </table>
 </div>
 
@@ -95,8 +89,9 @@ th{background:#f5f5f5}
 
 <!-- الديون -->
 <div id="debts" style="display:none">
+
 <div class="card">
-<input id="debtor" placeholder="الاسم">
+<input id="debtor" placeholder="اسم الشخص / الجهة">
 <input id="debtAmount" type="number" placeholder="المبلغ">
 <select id="debtType">
 <option value="owedToYou">مدين لك</option>
@@ -105,9 +100,22 @@ th{background:#f5f5f5}
 <button onclick="addDebt()">إضافة دين</button>
 </div>
 
+<!-- تصفية الديون -->
+<div class="card">
+<h4>تصفية الديون</h4>
+<select id="debtMonth" onchange="renderDebts()">
+<option value="">كل الشهور</option>
+</select>
+<select id="debtYear" onchange="renderDebts()">
+<option value="">كل السنوات</option>
+</select>
+</div>
+
 <div class="card">
 <table>
-<thead><tr><th>الاسم</th><th>المبلغ</th><th>النوع</th><th>التاريخ</th></tr></thead>
+<thead>
+<tr><th>الاسم</th><th>المبلغ</th><th>النوع</th><th>التاريخ</th></tr>
+</thead>
 <tbody id="debtList"></tbody>
 </table>
 </div>
@@ -119,21 +127,22 @@ th{background:#f5f5f5}
 
 <script>
 let transactions = JSON.parse(localStorage.getItem('financeData')) || [];
-let debts = JSON.parse(localStorage.getItem('debtData')) || [];
+let debtData = JSON.parse(localStorage.getItem('debtData')) || [];
 
 function showSection(s){
-finance.style.display = s==='finance'?'block':'none';
-debts.style.display = s==='debts'?'block':'none';
+finance.style.display=s==='finance'?'block':'none';
+debts.style.display=s==='debts'?'block':'none';
 financeBtn.classList.toggle('active',s==='finance');
 debtBtn.classList.toggle('active',s==='debts');
 }
 
 function addTransaction(){
-const t=type.value,c=category.value,d=desc.value,a=+amount.value;
-if(!d||a<=0)return;
 const date=new Date();
 transactions.push({
-type:t,category:c,desc:d,amount:a,
+type:type.value,
+category:category.value,
+desc:desc.value,
+amount:+amount.value,
 date:date.toLocaleDateString('ar-EG'),
 month:date.getMonth()+1,
 year:date.getFullYear()
@@ -144,28 +153,41 @@ updateFilters();renderTransactions();
 }
 
 function updateFilters(){
-filterMonth.innerHTML='<option value="">كل الشهور</option>';
-filterYear.innerHTML='<option value="">كل السنوات</option>';
+[expenseMonth, debtMonth].forEach(s=>s.innerHTML='<option value="">كل الشهور</option>');
+[expenseYear, debtYear].forEach(s=>s.innerHTML='<option value="">كل السنوات</option>');
+
 [...new Set(transactions.map(t=>t.month))].forEach(m=>{
-filterMonth.innerHTML+=`<option value="${m}">${m}</option>`;
+expenseMonth.innerHTML+=`<option value="${m}">${m}</option>`;
 });
 [...new Set(transactions.map(t=>t.year))].forEach(y=>{
-filterYear.innerHTML+=`<option value="${y}">${y}</option>`;
+expenseYear.innerHTML+=`<option value="${y}">${y}</option>`;
+});
+
+[...new Set(debtData.map(d=>d.month))].forEach(m=>{
+debtMonth.innerHTML+=`<option value="${m}">${m}</option>`;
+});
+[...new Set(debtData.map(d=>d.year))].forEach(y=>{
+debtYear.innerHTML+=`<option value="${y}">${y}</option>`;
 });
 }
 
 function renderTransactions(){
-list.innerHTML='';
+transactionList.innerHTML='';
 let inc=0,exp=0;
-const m=filterMonth.value,y=filterYear.value;
-transactions.filter(t=>(!m||t.month==m)&&(!y||t.year==y))
-.forEach(t=>{
-list.innerHTML+=`<tr>
+transactions.filter(t=>{
+if(t.type==='expense'){
+return (!expenseMonth.value||t.month==expenseMonth.value)
+&&(!expenseYear.value||t.year==expenseYear.value);
+}
+return true;
+}).forEach(t=>{
+transactionList.innerHTML+=`<tr>
 <td>${t.type==='income'?'دخل':'مصروف'}</td>
 <td>${t.category}</td>
 <td>${t.desc}</td>
 <td>${t.amount}</td>
-<td>${t.date}</td></tr>`;
+<td>${t.date}</td>
+</tr>`;
 t.type==='income'?inc+=t.amount:exp+=t.amount;
 });
 totalIncome.textContent=inc;
@@ -173,16 +195,37 @@ totalExpense.textContent=exp;
 balance.textContent=inc-exp;
 }
 
-function pauseOperations(){
-let s=+pauseTime.value;if(s<=0)return;
-addBtn.disabled=true;
-let i=setInterval(()=>{
-addBtn.textContent=`متوقف ${s--}`;
-if(s<0){clearInterval(i);addBtn.disabled=false;addBtn.textContent='إضافة';}
-},1000);
+function addDebt(){
+const date=new Date();
+debtData.push({
+debtor:debtor.value,
+amount:+debtAmount.value,
+type:debtType.value,
+date:date.toLocaleDateString('ar-EG'),
+month:date.getMonth()+1,
+year:date.getFullYear()
+});
+localStorage.setItem('debtData',JSON.stringify(debtData));
+debtor.value='';debtAmount.value='';
+updateFilters();renderDebts();
 }
 
-/* ===== PDF عربي ===== */
+function renderDebts(){
+debtList.innerHTML='';
+debtData.filter(d=>
+(!debtMonth.value||d.month==debtMonth.value)&&
+(!debtYear.value||d.year==debtYear.value)
+).forEach(d=>{
+debtList.innerHTML+=`<tr>
+<td>${d.debtor}</td>
+<td>${d.amount}</td>
+<td>${d.type==='owedToYou'?'مدين لك':'أنت مدين'}</td>
+<td>${d.date}</td>
+</tr>`;
+});
+}
+
+/* PDF عربي */
 async function loadFont(doc){
 const r=await fetch('NotoNaskhArabic-Regular.ttf');
 const b=await r.arrayBuffer();
@@ -214,29 +257,14 @@ doc.text('كشف الديون',200,15,{align:'right'});
 doc.autoTable({
 startY:25,
 head:[['التاريخ','الاسم','النوع','المبلغ']],
-body:debts.map(d=>[d.date,d.debtor,d.type==='owedToYou'?'مدين لك':'أنت مدين',d.amount]),
+body:debtData.map(d=>[d.date,d.debtor,d.type==='owedToYou'?'مدين لك':'أنت مدين',d.amount]),
 styles:{font:'arab',halign:'right'}
 });
 doc.save('الديون.pdf');
 }
 
-function addDebt(){
-const n=debtor.value,a=+debtAmount.value,t=debtType.value;
-if(!n||a<=0)return;
-debts.push({debtor:n,amount:a,type:t,date:new Date().toLocaleDateString('ar-EG')});
-localStorage.setItem('debtData',JSON.stringify(debts));
-debtor.value='';debtAmount.value='';
-renderDebts();
-}
-
-function renderDebts(){
-debtList.innerHTML='';
-debts.forEach(d=>{
-debtList.innerHTML+=`<tr><td>${d.debtor}</td><td>${d.amount}</td><td>${d.type==='owedToYou'?'مدين لك':'أنت مدين'}</td><td>${d.date}</td></tr>`;
-});
-}
-
 updateFilters();renderTransactions();renderDebts();
 </script>
+
 </body>
 </html>
