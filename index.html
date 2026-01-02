@@ -41,7 +41,7 @@ th{background:#f5f5f5}
 
 <div class="container">
 
-<!-- العمليات الحالية -->
+<!-- العمليات -->
 <div id="finance">
 
 <div class="card">
@@ -131,11 +131,12 @@ th{background:#f5f5f5}
 </div>
 
 <script>
+/* ===== المتغيرات ===== */
 let transactions = JSON.parse(localStorage.getItem('financeData')) || [];
 let debtData = JSON.parse(localStorage.getItem('debtData')) || [];
 let archiveData = JSON.parse(localStorage.getItem('archiveData')) || [];
 
-/* التنقل */
+/* ===== التنقل ===== */
 function showSection(s){
 finance.style.display=s==='finance'?'block':'none';
 debts.style.display=s==='debts'?'block':'none';
@@ -145,10 +146,10 @@ debtBtn.classList.toggle('active',s==='debts');
 archiveBtn.classList.toggle('active',s==='archive');
 }
 
-/* إضافة عملية */
+/* ===== العمليات ===== */
 function addTransaction(){
-if(!desc.value||amount.value<=0)return;
-const d=new Date();
+if(!desc.value || amount.value<=0) return;
+const d = new Date();
 transactions.push({
 type:type.value,
 category:category.value,
@@ -159,11 +160,10 @@ month:d.getMonth()+1,
 year:d.getFullYear()
 });
 localStorage.setItem('financeData',JSON.stringify(transactions));
-desc.value='';amount.value='';
+desc.value=''; amount.value='';
 renderTransactions();
 }
 
-/* عرض العمليات */
 function renderTransactions(){
 transactionList.innerHTML='';
 let inc=0,exp=0;
@@ -183,25 +183,30 @@ totalExpense.textContent=exp;
 balance.textContent=inc-exp;
 }
 
-/* إغلاق الشهر */
+/* ===== إغلاق الشهر ===== */
 function closeMonth(){
-if(!confirm('هل تريد إغلاق الشهر وترحيل المصروفات؟'))return;
+if(!confirm('هل تريد إغلاق الشهر وترحيل المصروفات؟')) return;
 const now=new Date();
-const m=now.getMonth()+1,y=now.getFullYear();
-const expenses=transactions.filter(t=>t.type==='expense'&&t.month===m&&t.year===y);
-if(!expenses.length)return alert('لا توجد مصروفات');
+const m = now.getMonth()+1;
+const y = now.getFullYear();
+
+// إصلاح النوع: تحويل للقيم الرقمية
+const expenses = transactions.filter(t => t.type==='expense' && Number(t.month)===m && Number(t.year)===y);
+if(!expenses.length) return alert('لا توجد مصروفات لهذا الشهر');
+
 archiveData.push({month:m,year:y,data:expenses});
-transactions=transactions.filter(t=>!(t.type==='expense'&&t.month===m&&t.year===y));
+transactions = transactions.filter(t => !(t.type==='expense' && Number(t.month)===m && Number(t.year)===y));
+
 localStorage.setItem('financeData',JSON.stringify(transactions));
 localStorage.setItem('archiveData',JSON.stringify(archiveData));
 updateArchiveSelect();
 renderTransactions();
-alert('تم إغلاق الشهر بنجاح');
+alert('تم إغلاق الشهر وترحيل المصروفات بنجاح');
 }
 
-/* الديون */
+/* ===== الديون ===== */
 function addDebt(){
-if(!debtor.value||debtAmount.value<=0)return;
+if(!debtor.value || debtAmount.value<=0) return;
 debtData.push({
 debtor:debtor.value,
 amount:+debtAmount.value,
@@ -209,7 +214,7 @@ type:debtType.value,
 date:new Date().toLocaleDateString('ar-EG')
 });
 localStorage.setItem('debtData',JSON.stringify(debtData));
-debtor.value='';debtAmount.value='';
+debtor.value=''; debtAmount.value='';
 renderDebts();
 }
 
@@ -226,7 +231,7 @@ debtList.innerHTML+=`
 });
 }
 
-/* الأرشيف */
+/* ===== الأرشيف ===== */
 function updateArchiveSelect(){
 archiveSelect.innerHTML='<option value="">اختر شهر</option>';
 archiveData.forEach((a,i)=>{
@@ -237,7 +242,7 @@ archiveSelect.innerHTML+=`<option value="${i}">${a.month}/${a.year}</option>`;
 function renderArchive(){
 archiveList.innerHTML='';
 const i=archiveSelect.value;
-if(i==='')return;
+if(i==='') return;
 archiveData[i].data.forEach(t=>{
 archiveList.innerHTML+=`
 <tr>
@@ -249,7 +254,15 @@ archiveList.innerHTML+=`
 });
 }
 
-/* PDF عربي */
+function clearArchive(){
+if(!confirm('هل تريد حذف كل الأرشيف؟')) return;
+archiveData=[];
+localStorage.removeItem('archiveData');
+updateArchiveSelect();
+archiveList.innerHTML='';
+}
+
+/* ===== PDF عربي ===== */
 async function loadFont(doc){
 const r=await fetch('NotoNaskhArabic-Regular.ttf');
 const b=await r.arrayBuffer();
@@ -289,7 +302,7 @@ doc.save('الديون.pdf');
 
 async function exportArchivePDF(){
 const i=archiveSelect.value;
-if(i==='')return;
+if(i==='') return;
 const {jsPDF}=window.jspdf;
 const doc=new jsPDF();
 await loadFont(doc);
@@ -304,15 +317,7 @@ styles:{font:'arab',halign:'right'}
 doc.save(`ارشيف_${a.month}_${a.year}.pdf`);
 }
 
-function clearArchive(){
-if(!confirm('حذف جميع الأرشيف؟'))return;
-archiveData=[];
-localStorage.removeItem('archiveData');
-updateArchiveSelect();
-archiveList.innerHTML='';
-}
-
-/* تحميل */
+/* ===== تحميل عند التشغيل ===== */
 renderTransactions();
 renderDebts();
 updateArchiveSelect();
