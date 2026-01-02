@@ -207,7 +207,7 @@ localStorage.setItem('financeData',JSON.stringify(transactions));
 renderTransactions();
 }
 
-/* ===== ترحيل الشهر مع الدخل والمصروف وحساب الفارق ===== */
+/* ===== ترحيل الشهر مع الرصيد السابق ===== */
 function closeMonth(){
 if(!confirm('هل تريد ترحيل كل العمليات وحساب الفارق؟')) return;
 
@@ -238,7 +238,23 @@ archiveData.push({
   status: status
 });
 
+// إزالة العمليات المرحلة
 transactions = transactions.filter(t => !(Number(t.month)===m && Number(t.year)===y));
+
+// إضافة الرصيد المتبقي كبداية للشهر التالي
+if(diff !== 0){
+    const nextDate = new Date();
+    nextDate.setMonth(nextDate.getMonth()+1);
+    transactions.push({
+      type: 'income',
+      category: 'رصيد من الحساب السابق',
+      desc: `رصيد ${status} من الشهر ${m}/${y}`,
+      amount: Math.abs(diff),
+      date: nextDate.toLocaleDateString('ar-EG'),
+      month: nextDate.getMonth()+1,
+      year: nextDate.getFullYear()
+    });
+}
 
 localStorage.setItem('financeData', JSON.stringify(transactions));
 localStorage.setItem('archiveData', JSON.stringify(archiveData));
@@ -248,12 +264,13 @@ renderTransactions();
 alert(`تم ترحيل الشهر بنجاح!\nالدخل: ${totalIncomeMonth}\nالمصروف: ${totalExpenseMonth}\n${status}: ${diff}`);
 }
 
+/* ===== ترحيل لحظي ===== */
 function instantClear(){
 if(!confirm('هل تريد ترحيل جميع العمليات الآن؟')) return;
+
 const allTransactions = transactions.filter(t=>true);
 if(allTransactions.length===0) return alert('لا توجد عمليات لترحيلها');
 
-const now = new Date();
 let totalIncomeMonth = 0;
 let totalExpenseMonth = 0;
 allTransactions.forEach(t=>{
@@ -265,8 +282,8 @@ const diff = totalIncomeMonth - totalExpenseMonth;
 const status = diff>=0 ? 'رصيد' : 'نقص';
 
 archiveData.push({
-  month: now.getMonth()+1,
-  year: now.getFullYear(),
+  month: new Date().getMonth()+1,
+  year: new Date().getFullYear(),
   transactions: allTransactions,
   totalIncome: totalIncomeMonth,
   totalExpense: totalExpenseMonth,
@@ -275,6 +292,22 @@ archiveData.push({
 });
 
 transactions = [];
+
+// إضافة الرصيد المتبقي للشهر التالي
+if(diff !== 0){
+    const nextDate = new Date();
+    nextDate.setMonth(nextDate.getMonth()+1);
+    transactions.push({
+      type: 'income',
+      category: 'رصيد من الحساب السابق',
+      desc: `رصيد ${status} من الترحيل اللحظي`,
+      amount: Math.abs(diff),
+      date: nextDate.toLocaleDateString('ar-EG'),
+      month: nextDate.getMonth()+1,
+      year: nextDate.getFullYear()
+    });
+}
+
 localStorage.setItem('financeData', JSON.stringify(transactions));
 localStorage.setItem('archiveData', JSON.stringify(archiveData));
 updateArchiveSelect();
@@ -368,7 +401,6 @@ archiveList.innerHTML+=`
 <td>${t.date}</td>
 </tr>`;
 });
-// يمكن إضافة عرض الفارق والرصيد هنا
 archiveList.innerHTML += `<tr><td colspan="4">الدخل: ${a.totalIncome} | المصروف: ${a.totalExpense} | ${a.status}: ${a.balance}</td></tr>`;
 }
 
