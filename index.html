@@ -11,7 +11,7 @@ header{background:#1e88e5;color:#fff;padding:15px;text-align:center;font-size:22
 .nav{display:flex}
 .nav button{flex:1;padding:12px;border:none;background:#1565c0;color:#fff;font-size:16px}
 .nav button.active{background:#1e88e5}
-.container{max-width:1000px;margin:auto;padding:15px}
+.container{max-width:1100px;margin:auto;padding:15px}
 .card{background:#fff;border-radius:12px;padding:15px;margin-bottom:15px;box-shadow:0 2px 8px rgba(0,0,0,.08)}
 input,select,button{width:100%;padding:10px;margin-top:8px;border-radius:8px;border:1px solid #ccc;font-size:16px}
 button{background:#1e88e5;color:#fff;border:none;cursor:pointer}
@@ -22,6 +22,7 @@ th{background:#f5f5f5}
 .box{flex:1;background:#e3f2fd;padding:10px;border-radius:10px;text-align:center}
 .income{color:#2e7d32;font-weight:bold}
 .expense{color:#c62828;font-weight:bold}
+.warning{background:#fff3e0}
 </style>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
@@ -35,11 +36,12 @@ th{background:#f5f5f5}
 <div class="nav">
 <button id="financeBtn" class="active" onclick="showSection('finance')">العمليات</button>
 <button id="debtBtn" onclick="showSection('debts')">الديون</button>
+<button id="archiveBtn" onclick="showSection('archive')">الأرشيف</button>
 </div>
 
 <div class="container">
 
-<!-- العمليات -->
+<!-- العمليات الحالية -->
 <div id="finance">
 
 <div class="card">
@@ -50,23 +52,18 @@ th{background:#f5f5f5}
 
 <select id="category">
 <option>راتب</option><option>إيجار</option><option>طعام</option>
-<option>مواصلات</option><option>تسوق</option><option>بيع</option>
+<option>مواصلات</option><option>تسوق</option><option>فواتير</option>
 </select>
 
 <input id="desc" placeholder="الوصف">
 <input id="amount" type="number" placeholder="المبلغ">
-<button id="addBtn" onclick="addTransaction()">إضافة</button>
+<button id="addBtn" onclick="addTransaction()">إضافة عملية</button>
 </div>
 
-<!-- تصفية المصروفات الشهرية -->
-<div class="card">
-<h4>تصفية المصروفات الشهرية</h4>
-<select id="expenseMonth" onchange="renderTransactions()">
-<option value="">كل الشهور</option>
-</select>
-<select id="expenseYear" onchange="renderTransactions()">
-<option value="">كل السنوات</option>
-</select>
+<div class="card warning">
+<h4>إغلاق الشهر</h4>
+<p>سيتم ترحيل مصروفات الشهر الحالي إلى الأرشيف</p>
+<button onclick="closeMonth()">تصفية وترحيل الشهر</button>
 </div>
 
 <div class="card">
@@ -84,14 +81,14 @@ th{background:#f5f5f5}
 <div class="box">الرصيد<br><span id="balance">0</span></div>
 </div>
 
-<button onclick="exportFinancePDF()">تصدير PDF</button>
+<button onclick="exportFinancePDF()">تصدير كشف الشهر PDF</button>
 </div>
 
 <!-- الديون -->
 <div id="debts" style="display:none">
 
 <div class="card">
-<input id="debtor" placeholder="اسم الشخص / الجهة">
+<input id="debtor" placeholder="الاسم / الجهة">
 <input id="debtAmount" type="number" placeholder="المبلغ">
 <select id="debtType">
 <option value="owedToYou">مدين لك</option>
@@ -100,27 +97,35 @@ th{background:#f5f5f5}
 <button onclick="addDebt()">إضافة دين</button>
 </div>
 
-<!-- تصفية الديون -->
 <div class="card">
-<h4>تصفية الديون</h4>
-<select id="debtMonth" onchange="renderDebts()">
-<option value="">كل الشهور</option>
-</select>
-<select id="debtYear" onchange="renderDebts()">
-<option value="">كل السنوات</option>
+<table>
+<thead><tr><th>الاسم</th><th>المبلغ</th><th>النوع</th><th>التاريخ</th></tr></thead>
+<tbody id="debtList"></tbody>
+</table>
+</div>
+
+<button onclick="exportDebtPDF()">تصدير كشف الديون PDF</button>
+</div>
+
+<!-- الأرشيف -->
+<div id="archive" style="display:none">
+
+<div class="card">
+<h4>الأشهر المؤرشفة</h4>
+<select id="archiveSelect" onchange="renderArchive()">
+<option value="">اختر شهر</option>
 </select>
 </div>
 
 <div class="card">
 <table>
-<thead>
-<tr><th>الاسم</th><th>المبلغ</th><th>النوع</th><th>التاريخ</th></tr>
-</thead>
-<tbody id="debtList"></tbody>
+<thead><tr><th>الفئة</th><th>الوصف</th><th>المبلغ</th><th>التاريخ</th></tr></thead>
+<tbody id="archiveList"></tbody>
 </table>
 </div>
 
-<button onclick="exportDebtPDF()">تصدير PDF</button>
+<button onclick="exportArchivePDF()">تصدير الشهر المؤرشف PDF</button>
+<button onclick="clearArchive()">حذف الأرشيف بالكامل</button>
 </div>
 
 </div>
@@ -128,60 +133,43 @@ th{background:#f5f5f5}
 <script>
 let transactions = JSON.parse(localStorage.getItem('financeData')) || [];
 let debtData = JSON.parse(localStorage.getItem('debtData')) || [];
+let archiveData = JSON.parse(localStorage.getItem('archiveData')) || [];
 
+/* التنقل */
 function showSection(s){
 finance.style.display=s==='finance'?'block':'none';
 debts.style.display=s==='debts'?'block':'none';
+archive.style.display=s==='archive'?'block':'none';
 financeBtn.classList.toggle('active',s==='finance');
 debtBtn.classList.toggle('active',s==='debts');
+archiveBtn.classList.toggle('active',s==='archive');
 }
 
+/* إضافة عملية */
 function addTransaction(){
-const date=new Date();
+if(!desc.value||amount.value<=0)return;
+const d=new Date();
 transactions.push({
 type:type.value,
 category:category.value,
 desc:desc.value,
 amount:+amount.value,
-date:date.toLocaleDateString('ar-EG'),
-month:date.getMonth()+1,
-year:date.getFullYear()
+date:d.toLocaleDateString('ar-EG'),
+month:d.getMonth()+1,
+year:d.getFullYear()
 });
 localStorage.setItem('financeData',JSON.stringify(transactions));
 desc.value='';amount.value='';
-updateFilters();renderTransactions();
+renderTransactions();
 }
 
-function updateFilters(){
-[expenseMonth, debtMonth].forEach(s=>s.innerHTML='<option value="">كل الشهور</option>');
-[expenseYear, debtYear].forEach(s=>s.innerHTML='<option value="">كل السنوات</option>');
-
-[...new Set(transactions.map(t=>t.month))].forEach(m=>{
-expenseMonth.innerHTML+=`<option value="${m}">${m}</option>`;
-});
-[...new Set(transactions.map(t=>t.year))].forEach(y=>{
-expenseYear.innerHTML+=`<option value="${y}">${y}</option>`;
-});
-
-[...new Set(debtData.map(d=>d.month))].forEach(m=>{
-debtMonth.innerHTML+=`<option value="${m}">${m}</option>`;
-});
-[...new Set(debtData.map(d=>d.year))].forEach(y=>{
-debtYear.innerHTML+=`<option value="${y}">${y}</option>`;
-});
-}
-
+/* عرض العمليات */
 function renderTransactions(){
 transactionList.innerHTML='';
 let inc=0,exp=0;
-transactions.filter(t=>{
-if(t.type==='expense'){
-return (!expenseMonth.value||t.month==expenseMonth.value)
-&&(!expenseYear.value||t.year==expenseYear.value);
-}
-return true;
-}).forEach(t=>{
-transactionList.innerHTML+=`<tr>
+transactions.forEach(t=>{
+transactionList.innerHTML+=`
+<tr>
 <td>${t.type==='income'?'دخل':'مصروف'}</td>
 <td>${t.category}</td>
 <td>${t.desc}</td>
@@ -195,32 +183,68 @@ totalExpense.textContent=exp;
 balance.textContent=inc-exp;
 }
 
+/* إغلاق الشهر */
+function closeMonth(){
+if(!confirm('هل تريد إغلاق الشهر وترحيل المصروفات؟'))return;
+const now=new Date();
+const m=now.getMonth()+1,y=now.getFullYear();
+const expenses=transactions.filter(t=>t.type==='expense'&&t.month===m&&t.year===y);
+if(!expenses.length)return alert('لا توجد مصروفات');
+archiveData.push({month:m,year:y,data:expenses});
+transactions=transactions.filter(t=>!(t.type==='expense'&&t.month===m&&t.year===y));
+localStorage.setItem('financeData',JSON.stringify(transactions));
+localStorage.setItem('archiveData',JSON.stringify(archiveData));
+updateArchiveSelect();
+renderTransactions();
+alert('تم إغلاق الشهر بنجاح');
+}
+
+/* الديون */
 function addDebt(){
-const date=new Date();
+if(!debtor.value||debtAmount.value<=0)return;
 debtData.push({
 debtor:debtor.value,
 amount:+debtAmount.value,
 type:debtType.value,
-date:date.toLocaleDateString('ar-EG'),
-month:date.getMonth()+1,
-year:date.getFullYear()
+date:new Date().toLocaleDateString('ar-EG')
 });
 localStorage.setItem('debtData',JSON.stringify(debtData));
 debtor.value='';debtAmount.value='';
-updateFilters();renderDebts();
+renderDebts();
 }
 
 function renderDebts(){
 debtList.innerHTML='';
-debtData.filter(d=>
-(!debtMonth.value||d.month==debtMonth.value)&&
-(!debtYear.value||d.year==debtYear.value)
-).forEach(d=>{
-debtList.innerHTML+=`<tr>
+debtData.forEach(d=>{
+debtList.innerHTML+=`
+<tr>
 <td>${d.debtor}</td>
 <td>${d.amount}</td>
 <td>${d.type==='owedToYou'?'مدين لك':'أنت مدين'}</td>
 <td>${d.date}</td>
+</tr>`;
+});
+}
+
+/* الأرشيف */
+function updateArchiveSelect(){
+archiveSelect.innerHTML='<option value="">اختر شهر</option>';
+archiveData.forEach((a,i)=>{
+archiveSelect.innerHTML+=`<option value="${i}">${a.month}/${a.year}</option>`;
+});
+}
+
+function renderArchive(){
+archiveList.innerHTML='';
+const i=archiveSelect.value;
+if(i==='')return;
+archiveData[i].data.forEach(t=>{
+archiveList.innerHTML+=`
+<tr>
+<td>${t.category}</td>
+<td>${t.desc}</td>
+<td>${t.amount}</td>
+<td>${t.date}</td>
 </tr>`;
 });
 }
@@ -239,14 +263,14 @@ async function exportFinancePDF(){
 const {jsPDF}=window.jspdf;
 const doc=new jsPDF();
 await loadFont(doc);
-doc.text('كشف العمليات المالية',200,15,{align:'right'});
+doc.text('كشف العمليات الحالية',200,15,{align:'right'});
 doc.autoTable({
 startY:25,
 head:[['التاريخ','النوع','الفئة','الوصف','المبلغ']],
 body:transactions.map(t=>[t.date,t.type==='income'?'دخل':'مصروف',t.category,t.desc,t.amount]),
 styles:{font:'arab',halign:'right'}
 });
-doc.save('العمليات.pdf');
+doc.save('العمليات_الحالية.pdf');
 }
 
 async function exportDebtPDF(){
@@ -263,7 +287,35 @@ styles:{font:'arab',halign:'right'}
 doc.save('الديون.pdf');
 }
 
-updateFilters();renderTransactions();renderDebts();
+async function exportArchivePDF(){
+const i=archiveSelect.value;
+if(i==='')return;
+const {jsPDF}=window.jspdf;
+const doc=new jsPDF();
+await loadFont(doc);
+const a=archiveData[i];
+doc.text(`مصروفات ${a.month}/${a.year}`,200,15,{align:'right'});
+doc.autoTable({
+startY:25,
+head:[['التاريخ','الفئة','الوصف','المبلغ']],
+body:a.data.map(t=>[t.date,t.category,t.desc,t.amount]),
+styles:{font:'arab',halign:'right'}
+});
+doc.save(`ارشيف_${a.month}_${a.year}.pdf`);
+}
+
+function clearArchive(){
+if(!confirm('حذف جميع الأرشيف؟'))return;
+archiveData=[];
+localStorage.removeItem('archiveData');
+updateArchiveSelect();
+archiveList.innerHTML='';
+}
+
+/* تحميل */
+renderTransactions();
+renderDebts();
+updateArchiveSelect();
 </script>
 
 </body>
