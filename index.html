@@ -209,31 +209,29 @@ localStorage.setItem('financeData',JSON.stringify(transactions));
 renderTransactions();
 }
 
-/* ===== إغلاق الشهر ===== */
+/* ===== الترحيل ===== */
 function closeMonth(){
 if(!confirm('هل تريد إغلاق الشهر وترحيل المصروفات؟')) return;
-const now=new Date();
+const now = new Date();
 const m = now.getMonth()+1;
 const y = now.getFullYear();
 const expenses = transactions.filter(t => t.type==='expense' && Number(t.month)===m && Number(t.year)===y);
-if(!expenses.length) return alert('لا توجد مصروفات لهذا الشهر');
+if(expenses.length===0) return alert('لا توجد مصروفات لترحيلها هذا الشهر');
 archiveData.push({month:m,year:y,data:expenses});
 transactions = transactions.filter(t => !(t.type==='expense' && Number(t.month)===m && Number(t.year)===y));
-localStorage.setItem('financeData',JSON.stringify(transactions));
-localStorage.setItem('archiveData',JSON.stringify(archiveData));
+localStorage.setItem('financeData', JSON.stringify(transactions));
+localStorage.setItem('archiveData', JSON.stringify(archiveData));
 updateArchiveSelect();
 renderTransactions();
-alert('تم إغلاق الشهر وترحيل المصروفات بنجاح');
+alert('تم ترحيل المصروفات بنجاح');
 }
 
-/* ===== التصفية اللحظية ===== */
 function instantClear(){
 if(!confirm('هل تريد تصفية وترحيل جميع المصروفات الآن؟')) return;
-const now = new Date();
-const d = now.toLocaleDateString('ar-EG');
 const allExpenses = transactions.filter(t => t.type==='expense');
-if(!allExpenses.length) return alert('لا توجد مصروفات لترحيلها');
-archiveData.push({month: now.getMonth()+1, year: now.getFullYear(), date:d, data: allExpenses});
+if(allExpenses.length===0) return alert('لا توجد مصروفات لترحيلها');
+const now = new Date();
+archiveData.push({month: now.getMonth()+1, year: now.getFullYear(), date: now.toLocaleDateString('ar-EG'), data: allExpenses});
 transactions = transactions.filter(t => t.type!=='expense');
 localStorage.setItem('financeData', JSON.stringify(transactions));
 localStorage.setItem('archiveData', JSON.stringify(archiveData));
@@ -339,16 +337,20 @@ archiveList.innerHTML='';
 
 /* ===== PDF عربي ===== */
 async function loadFontArabic(doc){
+  try{
     const fontUrl = 'NotoNaskhArabic-Regular.ttf';
     const response = await fetch(fontUrl);
-    const buffer = await response.arrayBuffer();
-    const bytes = new Uint8Array(buffer);
+    const arrayBuffer = await response.arrayBuffer();
+    const bytes = new Uint8Array(arrayBuffer);
     let binary = '';
-    for(let i=0;i<bytes.byteLength;i++){ binary += String.fromCharCode(bytes[i]); }
+    bytes.forEach(b => binary += String.fromCharCode(b));
     const base64 = btoa(binary);
     doc.addFileToVFS('NotoNaskhArabic-Regular.ttf', base64);
-    doc.addFont('NotoNaskhArabic-Regular.ttf','arabic','normal');
+    doc.addFont('NotoNaskhArabic-Regular.ttf', 'arabic', 'normal');
     doc.setFont('arabic');
+  } catch(e){
+    alert('خطأ في تحميل الخط العربي. تأكد أن ملف NotoNaskhArabic-Regular.ttf موجود في نفس المجلد');
+  }
 }
 
 async function exportFinancePDF(){
