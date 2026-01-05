@@ -6,7 +6,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 
 <style>
-body{font-family:Tajawal,Arial;background:#f4f6f8;margin:0}
+body{font-family:Arial;background:#f4f6f8;margin:0}
 header{background:#1e88e5;color:#fff;padding:15px;text-align:center;font-size:22px}
 .nav{display:flex}
 .nav button{flex:1;padding:12px;border:none;background:#1565c0;color:#fff}
@@ -23,15 +23,10 @@ th{background:#f5f5f5}
 .income{color:green;font-weight:bold}
 .expense{color:red;font-weight:bold}
 .actionBtn{padding:4px 8px;margin:2px;border-radius:6px;font-size:14px}
-.editBtn{background:#f9a825}
 .deleteBtn{background:#c62828}
-.payBtn{background:#2e7d32}
 </style>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.29/jspdf.plugin.autotable.min.js"></script>
 </head>
-
 <body>
 
 <header>المدير المالي الشخصي</header>
@@ -39,7 +34,6 @@ th{background:#f5f5f5}
 <div class="nav">
 <button class="active" onclick="show('finance')">العمليات</button>
 <button onclick="show('debts')">الديون</button>
-<button onclick="show('archive')">الأرشيف</button>
 </div>
 
 <div class="container">
@@ -47,34 +41,33 @@ th{background:#f5f5f5}
 <!-- العمليات -->
 <div id="finance">
 <div class="card">
-<select id="type">
-<option value="income">دخل</option>
-<option value="expense">مصروف</option>
-<option value="debtIncome">دخل دين</option>
-<option value="debtExpense">إخراج دين</option>
+
+<select id="mainType">
+  <option value="income">دخل</option>
+  <option value="expense">خرج</option>
 </select>
 
-<select id="category">
-<option>عام</option>
-<option>راتب</option>
-<option>طعام</option>
-<option>فواتير</option>
+<select id="subType">
+  <option value="normal">عادي</option>
+  <option value="debt">دين</option>
 </select>
 
 <input id="desc" placeholder="الوصف / اسم الشخص">
 <input id="amount" type="number" placeholder="المبلغ">
-<button onclick="addTransaction()">إضافة</button>
-</div>
 
-<div class="card">
-<button onclick="closeMonth()">ترحيل شهري</button>
-<button onclick="instantClear()">ترحيل لحظي</button>
+<button onclick="addTransaction()">إضافة عملية</button>
 </div>
 
 <div class="card">
 <table>
 <thead>
-<tr><th>النوع</th><th>الفئة</th><th>الوصف</th><th>المبلغ</th><th>التاريخ</th><th>إجراءات</th></tr>
+<tr>
+<th>النوع</th>
+<th>الوصف</th>
+<th>المبلغ</th>
+<th>التاريخ</th>
+<th>إجراء</th>
+</tr>
 </thead>
 <tbody id="transactionList"></tbody>
 </table>
@@ -82,11 +75,9 @@ th{background:#f5f5f5}
 
 <div class="summary">
 <div class="box income">الدخل<br><span id="totalIncome">0</span></div>
-<div class="box expense">المصروف<br><span id="totalExpense">0</span></div>
+<div class="box expense">الخرج<br><span id="totalExpense">0</span></div>
 <div class="box">الرصيد<br><span id="balance">0</span></div>
 </div>
-
-<button onclick="exportFinancePDF()">تصدير PDF</button>
 </div>
 
 <!-- الديون -->
@@ -94,239 +85,113 @@ th{background:#f5f5f5}
 <div class="card">
 <table>
 <thead>
-<tr><th>الاسم</th><th>المبلغ</th><th>النوع</th><th>التاريخ</th><th>إجراءات</th></tr>
+<tr>
+<th>الاسم</th>
+<th>المبلغ</th>
+<th>النوع</th>
+<th>إجراء</th>
+</tr>
 </thead>
 <tbody id="debtList"></tbody>
 </table>
 </div>
-<button onclick="exportDebtPDF()">تصدير الديون PDF</button>
-</div>
-
-<!-- الأرشيف -->
-<div id="archive" style="display:none">
-<div class="card">
-<select id="archiveSelect" onchange="renderArchive()">
-<option value="">اختر شهر</option>
-</select>
-</div>
-<div class="card">
-<table>
-<thead>
-<tr><th>الفئة</th><th>الوصف</th><th>المبلغ</th><th>التاريخ</th></tr>
-</thead>
-<tbody id="archiveList"></tbody>
-</table>
-</div>
-<button onclick="exportArchivePDF()">تصدير الأرشيف PDF</button>
 </div>
 
 </div>
 
 <script>
-let transactions = JSON.parse(localStorage.getItem('financeData')) || [];
-let debtData = JSON.parse(localStorage.getItem('debtData')) || [];
-let archiveData = JSON.parse(localStorage.getItem('archiveData')) || [];
+let transactions = JSON.parse(localStorage.getItem('finance')) || [];
+let debts = JSON.parse(localStorage.getItem('debts')) || [];
 
 function show(id){
-finance.style.display=id==='finance'?'block':'none';
-debts.style.display=id==='debts'?'block':'none';
-archive.style.display=id==='archive'?'block':'none';
+document.getElementById('finance').style.display = id === 'finance' ? 'block' : 'none';
+document.getElementById('debts').style.display = id === 'debts' ? 'block' : 'none';
 }
 
-/* ===== إضافة عملية + ربط الديون ===== */
 function addTransaction(){
-if(!desc.value || amount.value<=0) return;
-const d=new Date();
-const base={
-desc:desc.value,
-amount:+amount.value,
-date:d.toLocaleDateString('ar-EG'),
-month:d.getMonth()+1,
-year:d.getFullYear()
-};
+if(!desc.value || amount.value <= 0) return;
 
-if(type.value==='debtIncome'){
-transactions.push({...base,type:'income',category:'دخل دين'});
-debtData.push({debtor:desc.value,amount:+amount.value,type:'youOwe',date:base.date});
-}
+const d = new Date();
+const type = mainType.value;
+const sub = subType.value;
 
-else if(type.value==='debtExpense'){
-transactions.push({...base,type:'expense',category:'إخراج دين'});
-debtData.push({debtor:desc.value,amount:+amount.value,type:'owedToYou',date:base.date});
-}
+transactions.push({
+type,
+desc: desc.value,
+amount: Number(amount.value),
+date: d.toLocaleDateString('ar-EG')
+});
 
-else{
-transactions.push({...base,type:type.value,category:category.value});
+if(sub === 'debt'){
+debts.push({
+name: desc.value,
+amount: Number(amount.value),
+type: type === 'income' ? 'أنت مدين' : 'مدين لك'
+});
 }
 
 save();
-desc.value='';amount.value='';
+desc.value = '';
+amount.value = '';
 renderAll();
 }
 
-/* ===== عرض العمليات ===== */
 function renderTransactions(){
-transactionList.innerHTML='';
-let inc=0,exp=0;
+transactionList.innerHTML = '';
+let inc = 0, exp = 0;
+
 transactions.forEach((t,i)=>{
-transactionList.innerHTML+=`
+transactionList.innerHTML += `
 <tr>
-<td>${t.type==='income'?'دخل':'مصروف'}</td>
-<td>${t.category}</td>
+<td>${t.type === 'income' ? 'دخل' : 'خرج'}</td>
 <td>${t.desc}</td>
 <td>${t.amount}</td>
 <td>${t.date}</td>
-<td>
-<button class="actionBtn editBtn" onclick="editTransaction(${i})">تعديل</button>
-<button class="actionBtn deleteBtn" onclick="deleteTransaction(${i})">حذف</button>
-</td>
+<td><button class="actionBtn deleteBtn" onclick="delT(${i})">حذف</button></td>
 </tr>`;
-t.type==='income'?inc+=t.amount:exp+=t.amount;
+t.type === 'income' ? inc += t.amount : exp += t.amount;
 });
-totalIncome.textContent=inc;
-totalExpense.textContent=exp;
-balance.textContent=inc-exp;
+
+totalIncome.textContent = inc;
+totalExpense.textContent = exp;
+balance.textContent = inc - exp;
 }
 
-/* ===== تعديل / حذف ===== */
-function editTransaction(i){
-let t=transactions[i];
-let a=prompt('المبلغ',t.amount);
-if(a!==null&&!isNaN(a)) t.amount=+a;
-save();renderTransactions();
-}
-function deleteTransaction(i){
-if(confirm('حذف؟')){transactions.splice(i,1);save();renderTransactions();}
-}
-
-/* ===== ترحيل ===== */
-function closeMonth(){
-const d=new Date(),m=d.getMonth()+1,y=d.getFullYear();
-const month=transactions.filter(t=>t.month===m&&t.year===y);
-if(!month.length) return alert('لا يوجد بيانات');
-let inc=0,exp=0;
-month.forEach(t=>t.type==='income'?inc+=t.amount:exp+=t.amount);
-const diff=inc-exp;
-
-archiveData.push({month:m,year:y,transactions:month,totalIncome:inc,totalExpense:exp,balance:diff});
-transactions=transactions.filter(t=>!(t.month===m&&t.year===y));
-
-if(diff!==0){
-let n=new Date();n.setMonth(n.getMonth()+1);
-transactions.push({
-type:'income',
-category:'رصيد من الحساب السابق',
-desc:`رصيد مرحل ${m}/${y}`,
-amount:Math.abs(diff),
-date:n.toLocaleDateString('ar-EG'),
-month:n.getMonth()+1,
-year:n.getFullYear()
-});
-}
-save();renderAll();
-}
-
-function instantClear(){
-if(!transactions.length) return;
-archiveData.push({month:'لحظي',year:'',transactions:[...transactions]});
-transactions=[];
-save();renderAll();
-}
-
-/* ===== الديون ===== */
 function renderDebts(){
-debtList.innerHTML='';
-debtData.forEach((d,i)=>{
-debtList.innerHTML+=`
+debtList.innerHTML = '';
+debts.forEach((d,i)=>{
+debtList.innerHTML += `
 <tr>
-<td>${d.debtor}</td>
+<td>${d.name}</td>
 <td>${d.amount}</td>
-<td>${d.type==='youOwe'?'أنت مدين':'مدين لك'}</td>
-<td>${d.date}</td>
-<td>
-<button class="actionBtn payBtn" onclick="payDebt(${i})">سداد</button>
-<button class="actionBtn deleteBtn" onclick="deleteDebt(${i})">حذف</button>
-</td>
+<td>${d.type}</td>
+<td><button class="actionBtn deleteBtn" onclick="delD(${i})">حذف</button></td>
 </tr>`;
 });
 }
-function payDebt(i){
-let d=debtData[i];
-let p=prompt('مبلغ السداد',d.amount);
-if(p!==null&&!isNaN(p)){
-if(+p>=d.amount) debtData.splice(i,1);
-else d.amount-=+p;
-save();renderDebts();
-}
-}
-function deleteDebt(i){
-if(confirm('حذف الدين؟')){debtData.splice(i,1);save();renderDebts();}
+
+function delT(i){
+transactions.splice(i,1);
+save();
+renderAll();
 }
 
-/* ===== الأرشيف ===== */
-function updateArchive(){
-archiveSelect.innerHTML='<option value="">اختر</option>';
-archiveData.forEach((a,i)=>archiveSelect.innerHTML+=`<option value="${i}">${a.month}/${a.year}</option>`);
-}
-function renderArchive(){
-archiveList.innerHTML='';
-let a=archiveData[archiveSelect.value];
-if(!a) return;
-a.transactions.forEach(t=>{
-archiveList.innerHTML+=`<tr><td>${t.category}</td><td>${t.desc}</td><td>${t.amount}</td><td>${t.date}</td></tr>`;
-});
+function delD(i){
+debts.splice(i,1);
+save();
+renderAll();
 }
 
-/* ===== PDF ===== */
-async function loadFont(doc){
-const r=await fetch('NotoNaskhArabic-Regular.ttf');
-const b=await r.arrayBuffer();
-let s='';new Uint8Array(b).forEach(c=>s+=String.fromCharCode(c));
-doc.addFileToVFS('arabic.ttf',btoa(s));
-doc.addFont('arabic.ttf','arabic','normal');
-doc.setFont('arabic');
-}
-async function exportFinancePDF(){
-const {jsPDF}=window.jspdf;
-let d=new jsPDF();
-await loadFont(d);
-d.text('كشف العمليات',200,15,{align:'right'});
-d.autoTable({startY:25,head:[['التاريخ','النوع','الوصف','المبلغ']],
-body:transactions.map(t=>[t.date,t.type==='income'?'دخل':'مصروف',t.desc,t.amount]),
-styles:{font:'arabic',halign:'right'}});
-d.save('operations.pdf');
-}
-async function exportDebtPDF(){
-const {jsPDF}=window.jspdf;
-let d=new jsPDF();
-await loadFont(d);
-d.text('كشف الديون',200,15,{align:'right'});
-d.autoTable({startY:25,head:[['الاسم','المبلغ','النوع']],
-body:debtData.map(x=>[x.debtor,x.amount,x.type==='youOwe'?'أنت مدين':'مدين لك']),
-styles:{font:'arabic',halign:'right'}});
-d.save('debts.pdf');
-}
-async function exportArchivePDF(){
-let a=archiveData[archiveSelect.value];
-if(!a) return;
-const {jsPDF}=window.jspdf;
-let d=new jsPDF();
-await loadFont(d);
-d.text('الأرشيف',200,15,{align:'right'});
-d.autoTable({startY:25,head:[['الوصف','المبلغ','التاريخ']],
-body:a.transactions.map(t=>[t.desc,t.amount,t.date]),
-styles:{font:'arabic',halign:'right'}});
-d.save('archive.pdf');
-}
-
-/* ===== حفظ ===== */
 function save(){
-localStorage.setItem('financeData',JSON.stringify(transactions));
-localStorage.setItem('debtData',JSON.stringify(debtData));
-localStorage.setItem('archiveData',JSON.stringify(archiveData));
-updateArchive();
+localStorage.setItem('finance', JSON.stringify(transactions));
+localStorage.setItem('debts', JSON.stringify(debts));
 }
-function renderAll(){renderTransactions();renderDebts();updateArchive();}
+
+function renderAll(){
+renderTransactions();
+renderDebts();
+}
+
 renderAll();
 </script>
 
